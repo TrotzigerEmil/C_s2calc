@@ -5,9 +5,6 @@
    а также объявлена функция удаления newline из файла anewline.c . */
 #define BUFMULT 1024
 
-/* aNewLine: удаление символа newline из строки */
-void aNewLine(char *);
-
 /* inputString: чтение строки из stdin */
 char *inputString(void)
 {
