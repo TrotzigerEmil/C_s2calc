@@ -13,7 +13,9 @@
 
 #define REPL_MSG_START "LongCalc v1\nType \'%s\' to get help\n" // Сообщение-приветствие
 //Сообщение о помощи
-#define REPL_MSG_HELP "\t<infix notation expression> - evaluate expression\n\t%s - exit the program\n\t%s - print this message\n"
+#define REPL_MSG_HELP "\t<infix notation expression> - evaluate expression\n\t%s - exit the program\n\t%s - print this message\
+\nSupported operations: addition ('+'), subtraction ('-'), multiplication ('*')\
+\nParentheses are not supported\n"
 #define REPL_MSG_EXIT "Have a nice day.\n" //Сообщение-прощание
 #define REPL_MSG_ILLEGAL_EXPR "error: cannot evaluate expression\n" // Сообщение об ошибке преобразования
 #define REPL_CMD_HELP "help" // Команда "помощь"
@@ -31,9 +33,8 @@ char *decode(number a)
     }
     else
     {
-	ret = malloc(strlen(a) + 1);
-	strcpy(ret, a);
-	shift(&ret, 1, strlen(ret));
+	ret = malloc(strlen(a));
+	strcpy(ret, a + 1); // копируем со второго символа
     }
     return ret;
 }
