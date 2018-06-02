@@ -33,9 +33,8 @@ char *decode(number a)
     }
     else
     {
-	ret = malloc(strlen(a) + 1);
-	strcpy(ret, a);
-	shift(&ret, 1, strlen(ret));
+	ret = malloc(strlen(a));
+	strcpy(ret, a + 1); // копируем со второго символа
     }
     return ret;
 }
