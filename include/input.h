@@ -1,6 +1,9 @@
 #ifndef LONGCALC_H_INPUT
 #define LONGCALC_H_INPUT
 
+#include <stdio.h>
+#include <stdlib.h>
+
 /* В заголовочном файле input.h описана функция, возвращающая вводимое с клавиатуры выражение. */
 #define BUFMULT 1024
 
@@ -18,7 +21,7 @@ char *inputString(void)
     {
 	ret[bpos] = c;
 	bpos++;
-	if (bpos == bcursiz)
+	if (bpos == bcursiz) // заполнение текущего буфера
 	{
 	    bcursiz *= 2;
 	    ret = realloc(ret, bcursiz);

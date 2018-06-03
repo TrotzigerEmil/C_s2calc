@@ -12,16 +12,16 @@
 
 typedef char *number;
 
-/* shift: сдвинуть строку с числом на n разрядов вправо */
+/* shift: сдвинуть строку с числом на n разрядов влево */
 void shift(number *a, unsigned int n, unsigned int l)
 {
-    if (!n) return; 
-    for (int i = n; i <= l; i++) // shift
+    if (!n) return;
+    for (int i = n; i <= l; i++) // сдвиг
     {
 	(*a)[i - n] = (*a)[i];
     }
-	
-    *a = realloc(*a, l - n + 1); // strip off unused space
+
+    *a = realloc(*a, l - n + 1); // перераспределить ненужную память
 }
 
 /* stripsign: вернуть позицию мантиссы числа в дополнительном коде */
@@ -40,11 +40,11 @@ number inv(number a)
     signed i = strlen(a);
     ia[i] = 0;
     i--;
-	
+
     char cf = 0;
     while(i >= 0)
     {
-	ia[i] = ('9' - a[i] + cf + !a[i + 1]) % 10 + '0';
+	ia[i] = ('9' - a[i] + cf + !a[i + 1]) % 10 + '0'; // !a[i+1] - проверка на крайний правый символ
 	cf = ('9' - a[i] + cf + !a[i + 1]) / 10;
 	i--;
     }
@@ -67,12 +67,12 @@ number add(number a, number b)
     unsigned int rpos = lmtmp - 1;
     c[rpos] = 0;
     rpos--;
-	
+
     while(lena || lenb)
     {
 	/* Если одно из чисел короче другого,
 	 происходит чтение его знака из первого элемента строки. */
-	int calctmp = (a[lena ? lena - 1 : 0] + b[lenb ? lenb - 1 : 0] + cf - 2 * '0'); // two zeros to substract	      
+	int calctmp = (a[lena ? lena - 1 : 0] + b[lenb ? lenb - 1 : 0] + cf - 2 * '0'); // two zeros to substract
 	c[rpos] = (calctmp % 10) + '0'; // one zero to add
 	cf = calctmp / 10; // carry flag setup
 	lena = lena ? lena - 1 : lena;
@@ -87,7 +87,7 @@ number add(number a, number b)
     /* Знакорасширение */
     for (int i = rpos - 1; i >= 0; i--)
     {
-	c[i] = c[i + 1]; // copy sign
+	c[i] = c[i + 1];
     }
 
     /* Сдвиг */
@@ -95,7 +95,7 @@ number add(number a, number b)
     return c;
 }
 
-/* sub: возвращает результат вычитания b из a, представленных в ДК 
+/* sub: возвращает результат вычитания b из a, представленных в ДК
    реализовано при помощи функций сложения и инверса
    a - b = a + (-b) */
 
@@ -107,8 +107,8 @@ number sub(number a, number b)
     return r;
 }
 
-/* mul: возвращает результат умножения a на b, представленных в ДК 
-   происходит вычисление модулей a и b, умножение "в столбик" 
+/* mul: возвращает результат умножения a на b, представленных в ДК
+   происходит вычисление модулей a и b, умножение "в столбик"
    и инвертирование в зависимости от совокупности знаков */
 
 number mul(number a, number b)
@@ -121,7 +121,7 @@ number mul(number a, number b)
     number mulb = (*b == '0' ? b : inv(b)); //модуль b
 
     /* длины модулей */
-    unsigned int lena = strlen(mula); 
+    unsigned int lena = strlen(mula);
     unsigned int lenb = strlen(mulb);
     unsigned int lenc = lena + lenb;
     number ct = calloc(lenc, sizeof(char));
@@ -146,13 +146,13 @@ number mul(number a, number b)
 	tmp[i] %= 10;
 	ct[i] = tmp[i] + '0';
     }
-    
+
     free(tmp);
-    
+
     /* освобождение модулей, если на них была выделена память */
     if (*a == '9') free(mula);
     if (*b == '9') free(mulb);
-    
+
     *ct = '0'; // образование модуля произведения
     if (!sign) // одинаковые знаки
     {
@@ -166,6 +166,6 @@ number mul(number a, number b)
 	shift(&ctr, stripsign(ctr), strlen(ctr));
 	return ctr;
     }
-}     
+}
 
 #endif

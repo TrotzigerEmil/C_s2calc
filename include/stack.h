@@ -23,7 +23,7 @@ typedef struct
 } Stack;
 
 /* initStack: инициализация стека начальными значениями */
-Stack initStack(void) 
+Stack initStack(void)
 {
     Stack ret = {NULL};
     return ret;
