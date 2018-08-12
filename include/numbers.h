@@ -9,8 +9,22 @@
 #include <stdio.h>
 
 #define MAX(A, B) ((A) > (B) ? (A) : (B))
+#define LZ(A) (*(A) == '9')
+
+#define ZNUM "00"
 
 typedef char *number;
+
+/* cmp: сравнить два числа; возвращает 0, если числа равны, <0, если a < b, и >0, если a > b */
+int cmp(number a, number b)
+{
+    if (LZ(a) && !LZ(b)) return -1;
+    if (!LZ(a) && LZ(b)) return 1;
+    
+    char *ap = a, *bp = b;
+    while (*ap == *bp && *ap && *bp) {ap++; bp++;}
+    return *ap - *bp;
+}
 
 /* shift: сдвинуть строку с числом на n разрядов влево */
 void shift(number *a, unsigned int n, unsigned int l)
@@ -117,8 +131,8 @@ number mul(number a, number b)
     char sign = (*a ^ *b);
 
     char cf = 0;
-    number mula = (*a == '0' ? a : inv(a)); //модуль a
-    number mulb = (*b == '0' ? b : inv(b)); //модуль b
+    number mula = (!LZ(a) ? a : inv(a)); //модуль a
+    number mulb = (!LZ(b) ? b : inv(b)); //модуль b
 
     /* длины модулей */
     unsigned int lena = strlen(mula);
@@ -168,4 +182,79 @@ number mul(number a, number b)
     }
 }
 
+/* dvr: целочисленное деление с остатком
+   возвращает частное из функции или NULL при делении на 0
+   остаток возвращается через параметр функции r
+   (пока не реализовано) */
+number dvr(number a, number b, number *r)
+{
+    char sign = (*a ^ *b); // знак результата
+    
+    if (!cmp(b, ZNUM)) return NULL; // деление на 0
+    
+    number diva = (!LZ(a) ? a : inv(a)); // модули
+    number divb = (!LZ(b) ? b : inv(b));
+
+    printf("Dividing: %s / %s\n", diva, divb);
+    unsigned lena = strlen(diva); // длины модулей
+    unsigned lenb = strlen(divb);
+
+    number divc = malloc(2 * sizeof(char)); // результат
+    *divc = '0';
+    unsigned cpos = 1;
+
+    number tmp = malloc((lenb + 1) * sizeof(char));
+    int tmppos;
+    for (tmppos = 0; tmppos < lenb && diva[tmppos]; tmppos++)
+    {
+	*(tmp + tmppos) = *(diva + tmppos);
+    }
+    *(tmp + tmppos) = 0;
+
+    printf("Initial subtracted: %s\n", tmp);
+    do
+    {
+	int curdgt = 0;	
+	number looped = sub(tmp, divb);
+	
+	while (!LZ(looped))
+	{
+	    curdgt++;
+	    free(tmp);
+	    tmp = looped;	    
+	    looped = sub(tmp, divb);
+	}
+
+	printf("Times subtracted: %d\n", curdgt);
+	divc[cpos++] = '0' + curdgt;
+	divc = realloc(divc, (cpos + 1) * sizeof(char));
+	
+	free(tmp);
+	tmp = add(looped, divb);
+	free(looped);
+	int tmplen = strlen(tmp);
+	tmp = realloc(tmp, (tmplen + 2) * sizeof(char));
+	tmp[tmplen] = diva[tmppos];
+	tmp[tmplen + 1] = 0;
+	
+    } while (a[tmppos++]);
+
+    divc[cpos] = 0;
+    free(tmp);
+
+    if (LZ(a)) free(diva);
+    if (LZ(b)) free(divb);
+
+    if (!sign)
+    {
+	shift(&divc, stripsign(divc), strlen(divc));
+	return divc;
+    }
+    else
+    {
+	number divcinv = inv(divc);
+	free(divc);
+	return divcinv;
+    }
+}
 #endif
