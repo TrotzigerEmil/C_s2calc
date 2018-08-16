@@ -11,7 +11,8 @@
 #define MAX(A, B) ((A) > (B) ? (A) : (B))
 #define LZ(A) (*(A) == '9')
 
-#define ZNUM "00"
+#define LONGC_CONST_ZERO "00"
+#define LONGC_CONST_ONE "01"
 
 typedef char *number;
 
@@ -47,28 +48,7 @@ unsigned int stripsign(number a)
     return ret;
 }
 
-/* inv: возвращает -a в дополнительном коде */
-number inv(number a)
-{
-    number ia = malloc( (strlen(a) + 1) * sizeof(char) );
-    signed i = strlen(a);
-    ia[i] = 0;
-    i--;
-
-    char cf = 0;
-    while(i >= 0)
-    {
-	ia[i] = ('9' - a[i] + cf + !a[i + 1]) % 10 + '0'; // !a[i+1] - проверка на крайний правый символ
-	cf = ('9' - a[i] + cf + !a[i + 1]) / 10;
-	i--;
-    }
-
-    shift(&ia, stripsign(ia), strlen(ia));
-    return ia;
-}
-
 /* add: возвращает результат сложения a и b, представленных в доп. коде */
-
 number add(number a, number b)
 {
     unsigned int lena = strlen(a);
@@ -107,6 +87,25 @@ number add(number a, number b)
     /* Сдвиг */
     shift(&c, stripsign(c), strlen(c));
     return c;
+}
+
+/* inv: возвращает -a в доп. коде, вариант со сложением */
+number inv(number a)
+{
+    int len = strlen(a);
+    int i;
+    
+    number invtmp = malloc((len + 1) * sizeof(char));
+    for (i = 0; i < len; i++)
+    {
+	invtmp[i] = '9' - a[i] + '0';
+    }
+    invtmp[i] = 0;
+
+    number ret = add(invtmp, LONGC_CONST_ONE); // сдвиг тут
+    
+    free(invtmp);
+    return ret;
 }
 
 /* sub: возвращает результат вычитания b из a, представленных в ДК
@@ -190,7 +189,7 @@ number dvr(number a, number b, number *r)
 {
     char sign = (*a ^ *b); // знак результата
     
-    if (!cmp(b, ZNUM)) return NULL; // деление на 0
+    if (!cmp(b, LONGC_CONST_ZERO)) return NULL; // деление на 0
     
     number diva = (!LZ(a) ? a : inv(a)); // модули
     number divb = (!LZ(b) ? b : inv(b));
