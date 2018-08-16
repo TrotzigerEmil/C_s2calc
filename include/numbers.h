@@ -233,7 +233,7 @@ number dvr(number a, number b, number *r)
 	rem[remlen] = diva[rempos];
         rem[remlen + 1] = 0;
 	
-    } while (a[rempos++]);
+    } while (diva[rempos++]);
 
     divc[cpos] = 0;
 

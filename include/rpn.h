@@ -8,6 +8,7 @@
 #define ADD "+" // оператор сложения
 #define SUB "-" // оператор вычитания
 #define MUL "*" // оператор умножения
+#define DIV "/" // оператор целочисленного деления
 
 #include "numbers.h"
 #include "stack.h"
@@ -54,6 +55,10 @@ number parseString(char *rpnstr)
 	    if (!strcmp(token, MUL))
 	    {
 		c = mul(a, b);
+	    }
+	    if (!strcmp(token, DIV))
+	    {
+		c = dvr(a, b, NULL);
 	    }
 	    //printf("%s\n", c);
 	    push(c, &operands);
