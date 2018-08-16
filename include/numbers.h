@@ -189,12 +189,11 @@ number dvr(number a, number b, number *r)
 {
     char sign = (*a ^ *b); // знак результата
     
-    if (!cmp(b, LONGC_CONST_ZERO)) return NULL; // деление на 0
+    if (!cmp(b, LONGC_CONST_ZERO)) {return NULL;} // деление на 0
     
     number diva = (!LZ(a) ? a : inv(a)); // модули
     number divb = (!LZ(b) ? b : inv(b));
 
-    printf("Dividing: %s / %s\n", diva, divb);
     unsigned lena = strlen(diva); // длины модулей
     unsigned lenb = strlen(divb);
 
@@ -202,44 +201,56 @@ number dvr(number a, number b, number *r)
     *divc = '0';
     unsigned cpos = 1;
 
-    number tmp = malloc((lenb + 1) * sizeof(char));
-    int tmppos;
-    for (tmppos = 0; tmppos < lenb && diva[tmppos]; tmppos++)
+    number rem = malloc((lenb + 1) * sizeof(char));
+    int rempos;
+    for (rempos = 0; rempos < lenb && diva[rempos]; rempos++)
     {
-	*(tmp + tmppos) = *(diva + tmppos);
+	*(rem + rempos) = *(diva + rempos);
     }
-    *(tmp + tmppos) = 0;
+    *(rem + rempos) = 0;
 
-    printf("Initial subtracted: %s\n", tmp);
     do
     {
 	int curdgt = 0;	
-	number looped = sub(tmp, divb);
+	number looped = sub(rem, divb);
 	
 	while (!LZ(looped))
 	{
 	    curdgt++;
-	    free(tmp);
-	    tmp = looped;	    
-	    looped = sub(tmp, divb);
+	    free(rem);
+	    rem = looped;	    
+	    looped = sub(rem, divb);
 	}
 
-	printf("Times subtracted: %d\n", curdgt);
 	divc[cpos++] = '0' + curdgt;
 	divc = realloc(divc, (cpos + 1) * sizeof(char));
 	
-	free(tmp);
-	tmp = add(looped, divb);
+	free(rem);
+        rem = add(looped, divb);
 	free(looped);
-	int tmplen = strlen(tmp);
-	tmp = realloc(tmp, (tmplen + 2) * sizeof(char));
-	tmp[tmplen] = diva[tmppos];
-	tmp[tmplen + 1] = 0;
+	int remlen = strlen(rem);
+        rem = realloc(rem, (remlen + 2) * sizeof(char));
+	rem[remlen] = diva[rempos];
+        rem[remlen + 1] = 0;
 	
-    } while (a[tmppos++]);
+    } while (a[rempos++]);
 
     divc[cpos] = 0;
-    free(tmp);
+
+    if (!r) // остаток
+	free(rem);
+    else
+    {
+	if (LZ(a)) // a == ((a / b) * a) + a % b
+	{
+	    number tmp = inv(rem);
+	    number swp = tmp;
+	    tmp = rem;
+	    rem = swp;
+	    free(tmp);	    
+	}
+	*r = rem;
+    }
 
     if (LZ(a)) free(diva);
     if (LZ(b)) free(divb);
