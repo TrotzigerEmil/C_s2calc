@@ -5,36 +5,19 @@
    качестве данных строки символов, а также функции, производящие операции над сте-
    ком (инициализация, добавление на вершину, удаление с вершины, удаление стека). */
 
-struct node; // элемент стека
-typedef struct node *nptr;
+#define SUCCESS 0x00
+#define ERROR 0x01  /* выдать ошибку при заполнении  */
+#define EXPAND 0x02 /* расширить стек при заполнении */
 
-typedef struct node
-{
-    char *data;
-    nptr next;
-} StackNode;
+#define BSIZE 4096
 
-typedef struct
-{
-    nptr head;
-} Stack;
+struct stack;
 
-/* initStack: инициализация стека начальными значениями */
-Stack initStack(void);
-
-/* push: добавление новых данных на вершину стека */
-void push(char *data, Stack *S);
-
-/* pop: извлечение данных с вершины стека */
-char *pop(Stack *S);
-
-/* peek: просмотр вершины стека без ее удаления */
-char *peek(Stack *S);
-
-/* isEmpty: возвращает 1, если стек пуст, 0 в противном случае */
-int isEmpty(Stack S);
-
-/* killStack: освобождение памяти, занятой под данные стека и его структуру */
-void killStack(Stack *S);
+struct stack *mallocStack(size_t, size_t, int);
+int push(struct stack *, void *);
+int pop(struct stack *, void *);
+const void *const peek(struct stack *);
+int emptyp(struct stack *);
+void freeStack(struct stack *);
 
 #endif

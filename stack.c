@@ -1,60 +1,88 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <stddef.h>
 
 #include "stack.h"
 
-/* initStack: инициализация стека начальными значениями */
-Stack initStack(void)
+typedef struct stack
 {
-    Stack ret = {NULL};
-    return ret;
-}
+    void *data;
+    size_t esize;
+    size_t ssize;
+    size_t cur;
+    size_t bsize;
+    int flags;
+} Stack;
 
-/* push: добавление новых данных на вершину стека */
-void push(char *data, Stack *S)
+struct stack *mallocStack(size_t elsize, size_t maxsize, int flag)
 {
-    StackNode *new = malloc(sizeof(StackNode));
-    new->data = malloc(strlen(data) + 1);
-    strcpy(new->data, data);
-    new->next = S->head;
-    S->head = new;
-}
-
-/* pop: извлечение данных с вершины стека */
-char *pop(Stack *S)
-{
-    if (!(S->head)) return NULL;
-
-    char *ret = malloc(strlen(S->head->data) + 1);
-    strcpy(ret, S->head->data);
-
-    nptr nexth = S->head->next;
-    free(S->head->data);
-    free(S->head);
-    S->head = nexth;
+    if (flag != ERROR && flag != EXPAND) return NULL;
+    if (!elsize) return NULL;
+    
+    if (maxsize < BSIZE) maxsize = BSIZE;
+    
+    struct stack *ret = malloc(sizeof(struct stack));
+    ret->esize = elsize;
+    ret->ssize = ret->bsize = maxsize;
+    ret->flags = flag;
+    ret->data = malloc(ret->esize * ret->ssize);
+    ret->cur = 0;
 
     return ret;
 }
 
-/* peek: просмотр вершины стека без ее удаления */
-char *peek(Stack *S)
+int push(struct stack *stk, void *data)
 {
-    return (S->head) ? (S->head->data) : NULL;
-}
-
-/* isEmpty: возвращает 1, если стек пуст, 0 в противном случае */
-int isEmpty(Stack S)
-{
-    return !(S.head);
-}
-
-/* killStack: освобождение памяти, занятой под данные стека и его структуру */
-void killStack(Stack *S)
-{
-    while (!isEmpty(*S))
+    char changed = 0;
+    
+    if (stk->cur == stk->ssize)
     {
-	char *tmp = pop(S); // структура освобождена
-	free(tmp); // данные освобождены
+	if (stk->flag == EXPAND)
+	{
+	    void *tmp = realloc(stk->data, stk->ssize + stk->bsize);
+	    if (!tmp)		
+		return ERROR;
+	    stk->data = tmp;
+	    stk->ssize += stk->bsize;
+	    changed = 1;
+	}
+	else return ERROR;
     }
+
+    memcpy(stk->data + stk->esize * stk->cur, data, stk->esize);
+    (stk->cur)++;
+    return changed ? EXPAND : SUCCESS;
+}
+
+int pop(struct stack *stk, void *dst)
+{
+    if (!stk) return ERROR;
+
+    memcpy(dst, stk->data + (stk->cur - 1) * (stk->esize), stk->esize);
+    (stk->cur)--;
+
+    if (stk->cur <= stk->ssize - stk->bsize && stk->flags == EXPAND && stk->cur)
+    {
+	stk->data = realloc(stk->data, stk->ssize - stk->bsize);
+	stk->ssize -= stk->bsize;
+    }
+
+    return stk->ssize == stk->cur ? EXPAND : SUCCESS;
+}
+
+const void *const peek(struct stack *stk)
+{
+    return stk->cur ? stk->data + (stk->cur - 1) * stk->esize : NULL;
+}
+
+int emptyp(struct stack *stk)
+{
+    return !(stk->cur);
+}
+
+void freeStack(struct stack *stk)
+{
+    free(stk->data);
+    free(stk);
 }
