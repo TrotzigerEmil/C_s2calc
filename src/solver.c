@@ -7,7 +7,7 @@
 
 // RPN-Parse
 
-char isNumber(char *str)
+char isNumber(char *str) // возвращает 0 если str - число
 {
     while (*str && *str >= '0' && *str <= '9') str++;
     return *str;
@@ -15,7 +15,7 @@ char isNumber(char *str)
 
 char *parseString(char *rpnstr)
 {
-    Stack operands = initStack(); // инициализация стека начальными значениями
+    Stack *operands = mallocStack(sizeof(char *), 0, EXPAND, NULL); // инициализация стека начальными значениями
 
     /* проход по всем токенам выражения, разделенным пробелами */
     for (char *token = strtok(rpnstr, DELIM); token; token = strtok(NULL, DELIM))
@@ -23,44 +23,48 @@ char *parseString(char *rpnstr)
 	/* если токен - число, то отправить его в стек */
 	if (!isNumber(token))
 	{
-	    push(token, &operands);
+	    char *toPush = malloc(strlen(token) + 1);
+	    strcpy(toPush, token);
+	    push(operands, &toPush);
 	}
 	/* в ином случае извлечь данные из стека, совершить операцию,
 	   результат отправить в стек */
 	else
 	{
-	    char *b = pop(&operands);
-	    char *a = pop(&operands);
-	    //printf("%s %s\n", a, b);
-	    char *c;
-	    if (!strcmp(token, ADD))
+	    char *a, *b, *c;
+
+	    pop(operands, &b);
+	    pop(operands, &a);
+	    
+	    switch(*token)
 	    {
+	    case ADD:
 		c = add(a, b);
-	    }
-	    if (!strcmp(token, SUB))
-	    {
+		break;
+	    case SUB:
 		c = sub(a, b);
-	    }
-	    if (!strcmp(token, MUL))
-	    {
+		break;
+	    case MUL:
 		c = mul(a, b);
-	    }
-	    if (!strcmp(token, DIV))
-	    {
+		break;
+	    case DIV:
 		c = dvr(a, b, NULL);
+		break;
+	    default:
+		break; // этого не должно быть
 	    }
-	    //printf("%s\n", c);
-	    push(c, &operands);
+
+	    push(operands, &c);
 	    free(a);
 	    free(b);
-	    free(c);
 	}
 	
     }
     
-    char *result = malloc(strlen(peek(&operands)) + 1); // выделить память под строку на вершине стека
-    strcpy(result, peek(&operands)); // скопировать в возвращаемое значение
-    killStack(&operands); // освободить память, занятую стеком
+    char *result;
+    pop(operands, &result);
+
+    freeStack(operands); // освободить память, занятую стеком
     
     return result;
 }
@@ -82,7 +86,7 @@ struct state
     unsigned sizeofdigit; // Длина currentdgt
     int sign; // Знак числа
     
-    Stack operators; // Стек с операторами
+    Stack *operators; // Стек с операторами
 };
 
 /* Множество символов */
@@ -117,7 +121,7 @@ States freeState(State *S)
     free(S->currentdgt);
     S->currentdgt = NULL;
     S->sizeofdigit = 0;
-    killStack(&(S->operators));
+    freeStack(S->operators);
     return TERM;
 }
 
@@ -133,7 +137,7 @@ States changeSign(char c, State *S)
 States addDigit(char c, State *S)
 {
     (S->sizeofdigit)++;
-    //printf("sd: %u\n", S->sizeofdigit);
+    
     S->currentdgt = realloc(S->currentdgt, S->sizeofdigit);
     S->currentdgt[S->sizeofdigit - 1] = c;
     return DIGIT;
@@ -190,9 +194,9 @@ States writeDigit(State *S, States ret)
 }
 
 /* condIfEmpty: используется для выброса всех элементов из стека */
-int condIfEmpty(Stack S, char c)
+int condIfEmpty(Stack *S, char c)
 {
-    return isEmpty(S);
+    return emptyp(S);
 }
 
 /* writeOperators: записывает в результат операторы из стека в соответствии с функцией f */
@@ -201,24 +205,24 @@ States writeOperators(char c, State *S, cond f, States ret)
     while (!f(S->operators, c))
     {
 	S->res = realloc(S->res, S->reslen + 2);
-	char *op = pop(&(S->operators));
-        S->res[S->reslen] = *op;
+	char op;
+	pop(S->operators, &op);
+        S->res[S->reslen] = op;
         S->res[S->reslen + 1] = '\x20';
         S->reslen += 2;
-	free(op);
     }
 
     return ret;
 }
 
 /* condIfPriority: используется для выброса тех элементов стека, приоритет которых больше или равен данному */
-int condIfPriority(Stack S, char c)
+int condIfPriority(Stack *S, char c)
 {
     int cond1, cond2;
 
-    if (!(S.head)) return 1;
+    if (emptyp(S)) return 1;
 
-    cond1 = inSet(*(S.head->data), s_binop) / 2;
+    cond1 = inSet(*((char *)peek(S)), s_binop) / 2;
     cond2 = inSet(c, s_binop) / 2;
     
     return cond1 < cond2;
@@ -227,11 +231,17 @@ int condIfPriority(Stack S, char c)
 /* printState: выводит текущее состояние автомата */
 void printState(State S)
 {    
-    printf("resptr: %p\nrespos: %u\ncurstate: %d\ninfixpos: %u\ncdptr: %p\ncdsize: %u\nsign: %d\nstack contents: ", S.res, S.reslen, S.cstate, S.infpos, S.currentdgt, S.sizeofdigit, S.sign);
-    for (nptr i = S.operators.head; i; i = i->next)
-    {
-	printf("%c ", *(i->data));
-    }
+    printf("resptr: %p\nrespos: %u\ncurstate: %d\ninfixpos: %u\ncdptr: %p\ncdsize: %u\nsign: %d\nstack contents: ",
+	   S.res,
+	   S.reslen,
+	   S.cstate,
+	   S.infpos,
+	   S.currentdgt,
+	   S.sizeofdigit,
+	   S.sign);
+    
+    printStack(S.operators);
+    
     printf("\nres contents: ");
     for (unsigned i = 0; i < S.reslen; i++)
     {
@@ -250,11 +260,9 @@ States DtoB(State *S, char c)
 {
     writeDigit(S, BINOP);
     S->cstate = writeOperators(c, S, condIfPriority, BINOP);
-    char *ins = malloc(2);
-    *ins = c;
-    ins[1] = 0;
-    push(ins, &(S->operators));
-    free(ins);
+    
+    push(S->operators, &c);
+
     return BINOP;
 }
 
@@ -270,7 +278,7 @@ States DtoB(State *S, char c)
 /* InfixToRPN: возвращает строку с выражением в ПФЗ или NULL, если преобразование не удалось */
 char *InfixToRPN(char *infix)
 {
-    State C = {NULL, 0, SIGN, SIGN, 0, NULL, 0, 1, initStack()}; // инициализация состояния
+    State C = {NULL, 0, SIGN, SIGN, 0, NULL, 0, 1, mallocStack(sizeof(char), 0, EXPAND, printops)}; // инициализация состояния
     char *ret = NULL; // возвращаемое значение
     while(infix[C.infpos] == '\x20') (C.infpos)++; // пропуск ведущих пробелов
 
@@ -378,4 +386,20 @@ char *InfixToRPN(char *infix)
     }
     
     return ret;
+}
+
+void printops(Stack *this)
+{
+    putchar('{');
+
+    size_t cur = getsize(this);
+    const char *const head = peek(this);
+    
+    for (size_t stkcur = 0; stkcur < cur; stkcur++)
+    {
+	putchar(*((char *)(head - stkcur)));
+	putchar(' ');
+    }
+
+    printf("%c}\n", cur ? '\b' : '\0');
 }
