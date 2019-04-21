@@ -5,7 +5,7 @@
 #include "solver.h"
 #include "numbers.h"
 
-// RPN-Parse
+// RPN-Parse -------------------------------------------------------------------
 
 char isNumber(char *str) // возвращает 0 если str - число
 {
@@ -15,7 +15,8 @@ char isNumber(char *str) // возвращает 0 если str - число
 
 char *parseString(char *rpnstr)
 {
-    Stack *operands = mallocStack(sizeof(char *), 0, EXPAND, NULL); // инициализация стека начальными значениями
+    Stack *operands = mallocStack(sizeof(char *), 0, EXPAND, NULL);
+    // инициализация стека начальными значениями
 
     /* проход по всем токенам выражения, разделенным пробелами */
     for (char *token = strtok(rpnstr, DELIM); token; token = strtok(NULL, DELIM))
@@ -68,12 +69,15 @@ char *parseString(char *rpnstr)
     
     return result;
 }
+//------------------------------------------------------------------------------
 
 // Infix-To-RPN
 
 /* Структура, содержащая все данные, необходимые для преобразования выражения */
 struct state
 {
+    unsigned char running;
+    
     char *res; // Выражение-результат
     unsigned reslen; // Длина res
     
@@ -96,13 +100,30 @@ struct set
     unsigned size;
 };
 
-Set s_digit = {"0123456789", 10}; // множество ЦИФРА
-Set s_sign = {"+-", 2}; // множество ЗНАКЧИСЛА
-Set s_binop = {"+-*/", 4}; // множество ОПЕРАТОР
-Set s_term = {"\0", 1}; // множество ТЕРМИНАТОР
-Set s_spc = {"\x20\x00", 1}; // множество ПРОБЕЛ
+const Set s_digit = {"0123456789", 10}; // множество ЦИФРА
+const Set s_sign = {"+-", 2}; // множество ЗНАКЧИСЛА
+const Set s_binop = {"+-*/", 4}; // множество ОПЕРАТОР
+const Set s_term = {"\0", 1}; // множество ТЕРМИНАТОР
+const Set s_spc = {"\x20\x00", 1}; // множество ПРОБЕЛ
 
-/* inSet: возвращает позицию символа в заданном множестве, или -1, если символа нет во множестве */
+State *initState(void)
+{
+    State *ret = malloc(sizeof(State));
+    ret->running = 1;
+    ret->res = NULL;
+    ret->reslen = 0;
+    ret->cstate = SIGN;
+    ret->pstate = SIGN;
+    ret->infpos = 0;
+    ret->currentdgt = NULL;
+    ret->sizeofdigit = 0;
+    ret->sign = 1;
+    ret->operators = mallocStack(sizeof(char), 0, EXPAND, printops);
+    return ret;
+}
+
+/* inSet: возвращает позицию символа в заданном множестве, или -1, 
+   если символа нет во множестве */
 int inSet(char c, Set set)
 {
     for (int i = 0; i < set.size; i++)
@@ -112,17 +133,41 @@ int inSet(char c, Set set)
     return -1;
 }
 
-/* freeState: перевод автомата в конечное состояние */
-States freeState(State *S)
+int whichSet(char c, State *S)
 {
-    free(S->res);
-    S->res = NULL;
-    S->reslen = 0;
+    if (inSet(c, s_digit) >= 0)
+	return DIGIT;
+    if (inSet(c, s_term) >= 0)
+	return TERM;
+    if (inSet(c, s_spc) >= 0)
+	return SPC;
+
+    if (inSet(c, s_binop) >= 0 && (S->cstate == DIGIT || S->pstate == DIGIT))
+	return BINOP;
+    if (inSet(c, s_sign) >= 0 && (S->cstate == SIGN || S->pstate == SIGN
+				  || S->cstate == BINOP || S->pstate == BINOP))
+	return SIGN;
+    
+    return -1;
+}
+
+/* exitState: перевод автомата в конечное состояние */
+States exitState(char c, State *S)
+{
+    S->running = 0;
+
     free(S->currentdgt);
     S->currentdgt = NULL;
     S->sizeofdigit = 0;
-    freeStack(S->operators);
+    clearStack(S->operators);
     return TERM;
+}
+
+void freeState(State *S)
+{
+    free(S->res);    
+    freeStack(S->operators);
+    free(S);    
 }
 
 /* changeSign: меняет знак считываемого числа на противоположный */
@@ -174,7 +219,7 @@ number encode(State *S)
 }
 
 /* writeDigit: дописывает полученное число в конец результата */
-States writeDigit(State *S, States ret)
+void writeNumber(State *S)
 {
     number wrt = encode(S);
     unsigned wrts = strlen(wrt);
@@ -189,18 +234,10 @@ States writeDigit(State *S, States ret)
     free(S->currentdgt);
     free(wrt);
     S->currentdgt = NULL;
-
-    return ret;
-}
-
-/* condIfEmpty: используется для выброса всех элементов из стека */
-int condIfEmpty(Stack *S, char c)
-{
-    return emptyp(S);
 }
 
 /* writeOperators: записывает в результат операторы из стека в соответствии с функцией f */
-States writeOperators(char c, State *S, cond f, States ret)
+void writeOperators(char c, State *S, cond f)
 {
     while (!f(S->operators, c))
     {
@@ -211,8 +248,12 @@ States writeOperators(char c, State *S, cond f, States ret)
         S->res[S->reslen + 1] = '\x20';
         S->reslen += 2;
     }
+}
 
-    return ret;
+/* condIfEmpty: используется для выброса всех элементов из стека */
+int condIfEmpty(Stack *S, char c)
+{
+    return emptyp(S);
 }
 
 /* condIfPriority: используется для выброса тех элементов стека, приоритет которых больше или равен данному */
@@ -228,42 +269,65 @@ int condIfPriority(Stack *S, char c)
     return cond1 < cond2;
 }
 
-/* printState: выводит текущее состояние автомата */
-void printState(State S)
-{    
-    printf("resptr: %p\nrespos: %u\ncurstate: %d\ninfixpos: %u\ncdptr: %p\ncdsize: %u\nsign: %d\nstack contents: ",
-	   S.res,
-	   S.reslen,
-	   S.cstate,
-	   S.infpos,
-	   S.currentdgt,
-	   S.sizeofdigit,
-	   S.sign);
-    
-    printStack(S.operators);
-    
-    printf("\nres contents: ");
-    for (unsigned i = 0; i < S.reslen; i++)
-    {
-	printf("%c", S.res[i]);
-    }
-    printf("\ncd contents: ");
-    for (unsigned i = 0; i < S.sizeofdigit; i++)	
-    {
-	printf("%c", S.currentdgt[i]);
-    }
-    printf("\n\n");
-}
-
 /* DtoB: переход от ЦИФРА к ОПЕРАТОР */
-States DtoB(State *S, char c)
+States DtoB(char c, State *S)
 {
-    writeDigit(S, BINOP);
-    S->cstate = writeOperators(c, S, condIfPriority, BINOP);
+    writeNumber(S);
+    writeOperators(c, S, condIfPriority);
     
     push(S->operators, &c);
 
     return BINOP;
+}
+
+States exitNoWrite(char c, State *S)
+{
+    free(S->res);
+    S->res = NULL;
+    (S->infpos)--;
+    return TERM;
+}
+
+States exitWrite(char c, State *S)
+{
+    writeNumber(S);
+    writeOperators(c, S, condIfEmpty); 
+    S->res[S->reslen - 1] = 0;
+    (S->infpos)--;
+    return TERM;
+}
+
+States writePrevState(char c, State *S)
+{
+    S->pstate = S->cstate;
+    return SPC;
+}
+
+States checkIfBinop(char c, State *S)
+{
+    if (S->pstate != BINOP)
+	return exitNoWrite(c, S);
+    if (inSet(c, s_sign) >= 0)
+	return changeSign(c, S);
+    else if (inSet(c, s_digit) >= 0)
+	return addDigit(c, S);
+    else return exitNoWrite(c, S);    
+}
+
+States checkIfDigit(char c, State *S)
+{
+    if (S->pstate != DIGIT)
+	return exitNoWrite(c, S);
+    if (inSet(c, s_binop) >= 0)
+	return DtoB(c, S);
+    else if (inSet(c, s_term) >= 0)
+	return exitWrite(c, S);
+    else return exitNoWrite(c, S);
+}
+
+States nilf(char c, State *S)
+{
+    return SPC;
 }
 
 /* Алгоритм преобразования выражения в ИФЗ в выражение в ПФЗ (алгоритм Дейкстры) для данных условий:
@@ -278,113 +342,36 @@ States DtoB(State *S, char c)
 /* InfixToRPN: возвращает строку с выражением в ПФЗ или NULL, если преобразование не удалось */
 char *InfixToRPN(char *infix)
 {
-    State C = {NULL, 0, SIGN, SIGN, 0, NULL, 0, 1, mallocStack(sizeof(char), 0, EXPAND, printops)}; // инициализация состояния
-    char *ret = NULL; // возвращаемое значение
-    while(infix[C.infpos] == '\x20') (C.infpos)++; // пропуск ведущих пробелов
-
-    /* Все переходы, не выраженные в конструкции ниже, являются неверными и приводят к выходу из подпрограммы с возвратом 0. */
-    while (C.cstate != TERM) // состояние ТЕРМИНАТОР приводит к выходу и возвращению выражения
-    {        
-	switch(C.cstate)
-	{
-	case SIGN:
-	{
-	    if (inSet(infix[C.infpos], s_sign) >= 0) // ЗНАК -> ЗНАК
-	    {
-		C.cstate = changeSign(infix[C.infpos], &C);
-	    }
-	    else if (inSet(infix[C.infpos], s_digit) >= 0) // ЗНАК -> ЦИФРА
-	    {
-		C.cstate = addDigit(infix[C.infpos], &C);
-	    }
-	    else C.cstate = freeState(&C); // остальные переходы
-	    break;
-	}
-	case DIGIT:
-	{
-	    if (inSet(infix[C.infpos], s_digit) >= 0) // ЦИФРА -> ЦИФРА
-	    {
-	        C.cstate = addDigit(infix[C.infpos], &C);
-	    }
-	    else if (inSet(infix[C.infpos], s_binop) >= 0) // ЦИФРА -> ОПЕРАТОР
-	    {
-		C.cstate = DtoB(&C, infix[C.infpos]);
-	    }
-	    else if (inSet(infix[C.infpos], s_term) >= 0) // ЦИФРА -> ТЕРМИНАТОР
-	    {
-		writeDigit(&C, TERM);
-		C.cstate = writeOperators(infix[C.infpos], &C, condIfEmpty, TERM);
-		C.res[C.reslen - 1] = 0;
-		ret = malloc(C.reslen);
-		strcpy(ret, C.res);
-		//printState(C);
-		C.cstate = freeState(&C);
-	    }
-	    else if (inSet(infix[C.infpos], s_spc) >= 0) // ЦИФРА -> ПРОБЕЛ
-	    {
-		C.pstate = C.cstate;
-		C.cstate = SPC;
-	    }
-	    else C.cstate = freeState(&C); // ЦИФРА -> ЗНАК
-	    break;
-	}
-	case BINOP:
-	{
-	    if (inSet(infix[C.infpos], s_sign) >= 0) // ОПЕРАТОР -> ЗНАК
-	    {
-		C.cstate = changeSign(infix[C.infpos], &C);
-	    }
-	    else if (inSet(infix[C.infpos], s_digit) >= 0) // ОПЕРАТОР -> ЦИФРА
-	    {
-		C.cstate = addDigit(infix[C.infpos], &C);
-	    }
-	    else if (inSet(infix[C.infpos], s_spc) >= 0) // ОПЕРАТОР -> ПРОБЕЛ
-	    {
-		C.pstate = C.cstate;
-		C.cstate = SPC;
-	    }
-	    else C.cstate = freeState(&C); // ОСТАЛЬНЫЕ ПЕРЕХОДЫ
-	    break;
-	}
-
-	case SPC:
-	{
-	    if (inSet(infix[C.infpos], s_spc) >= 0) // ПРОБЕЛ -> ПРОБЕЛ
-	    {
-		C.cstate = SPC;
-	    }
-	    else if (C.pstate == DIGIT && inSet(infix[C.infpos], s_binop) >= 0) // ЦИФРА -> ПРОБЕЛ -> ОПЕРАТОР
-	    {
-		C.pstate = SIGN;
-		C.cstate = DtoB(&C, infix[C.infpos]);
-	    }
-	    else if (C.pstate == DIGIT && inSet(infix[C.infpos], s_term) >= 0) // ЦИФРА -> ПРОБЕЛ -> ТЕРМИНАТОР
-	    {
-		C.pstate = SIGN;
-		writeDigit(&C, TERM);
-		C.cstate = writeOperators(infix[C.infpos], &C, condIfEmpty, TERM); 
-		C.res[C.reslen - 1] = 0;
-		ret = malloc(C.reslen);
-		strcpy(ret, C.res);
-		//printState(C);
-		C.cstate = freeState(&C);
-	    }
-	    else if (C.pstate == BINOP && inSet(infix[C.infpos], s_sign) >= 0) // ОПЕРАТОР -> ПРОБЕЛ -> ЗНАКЧИСЛА
-	    {
-		C.pstate = SIGN;
-		C.cstate = changeSign(infix[C.infpos], &C);		
-	    }
-	    else if (C.pstate == BINOP && inSet(infix[C.infpos], s_digit) >= 0) // ОПЕРАТОР -> ПРОБЕЛ -> ЦИФРА
-	    {
-		C.pstate = SIGN;
-		C.cstate = addDigit(infix[C.infpos], &C);
-	    }
-	    else C.cstate = freeState(&C); // ОСТАЛЬНЫЕ ПЕРЕХОДЫ
-	}
-	}	
-	(C.infpos)++; // следующий символ	
-    }
+    State *C = initState();
     
+    char *ret = NULL; // возвращаемое значение
+    while(infix[C->infpos] == '\x20') (C->infpos)++; // пропуск ведущих пробелов
+
+    matf trmat[SETAMT][SETAMT] =
+	{
+	    {changeSign,   addDigit,     exitNoWrite,  exitNoWrite,  exitNoWrite   },
+	    {exitNoWrite,  addDigit,     DtoB,         exitWrite,    writePrevState},
+	    {changeSign,   addDigit,     exitNoWrite,  exitNoWrite,  writePrevState},
+	    {exitState,    exitState,    exitState,    exitState,    exitState     },
+	    {checkIfBinop, checkIfBinop, checkIfDigit, checkIfDigit, nilf          }
+	};
+
+    while(C->running)
+    {
+	char cur = infix[C->infpos];
+	int column = whichSet(cur, C);
+	
+	C->cstate = column < 0 ? exitNoWrite(cur, C) : (trmat[C->cstate][column])(cur, C);
+
+	printf("%d\n", C->cstate);
+	
+	(C->infpos)++;
+    }
+
+    ret = malloc(C->reslen + 1);
+    strcpy(ret, C->res);
+    freeState(C);
+  
     return ret;
 }
 
@@ -402,4 +389,32 @@ void printops(Stack *this)
     }
 
     printf("%c}\n", cur ? '\b' : '\0');
+}
+
+
+/* printState: выводит текущее состояние автомата */
+void printState(State *S)
+{    
+    printf("resptr: %p\nrespos: %u\ncurstate: %d\ninfixpos: %u\ncdptr: %p\ncdsize: %u\nsign: %d\nstack contents: ",
+	   S->res,
+	   S->reslen,
+	   S->cstate,
+	   S->infpos,
+	   S->currentdgt,
+	   S->sizeofdigit,
+	   S->sign);
+    
+    printStack(S->operators);
+    
+    printf("\nres contents: ");
+    for (unsigned i = 0; i < S->reslen; i++)
+    {
+	printf("%c", S->res[i]);
+    }
+    printf("\ncd contents: ");
+    for (unsigned i = 0; i < S->sizeofdigit; i++)	
+    {
+	printf("%c", S->currentdgt[i]);
+    }
+    printf("\n\n");
 }

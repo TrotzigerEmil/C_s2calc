@@ -1,0 +1,9 @@
+env = Environment(CPPPATH = '#include', CCFLAGS = '-Wall', LIBPATH = '#lib')
+
+srcfiles = ['numbers.c', 'repl.c', 'solver.c']
+libs = ['input', 'stack']
+
+progname = 'longcalc'
+progfiles = ['main.c'] + srcfiles
+
+env.Program(progname, progfiles, LIBS = libs)

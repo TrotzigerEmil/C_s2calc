@@ -46,7 +46,7 @@ int repl(void)
     do
     {
         printf("> ");
-        in = inputString(); // ввод строки (R)
+        in = getln(); // ввод строки (R)
 
 	if (!strcmp(in, REPL_CMD_HELP)) // получена команда "помощь"
 	{
@@ -78,5 +78,6 @@ int repl(void)
 	free(rpn);
 	in = res = dres = rpn = NULL;
     } while(running); // цикл (L)
+
     return 0;
 }

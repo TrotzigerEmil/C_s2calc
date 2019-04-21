@@ -1,3 +1,2 @@
-SConscript(dirs = 'lib')
-SConscript('src/SConscript', variant_dir = 'build', duplicate = 0)
+SConscript('src/SConscriptPrg', variant_dir = 'build', duplicate = 0)
 
