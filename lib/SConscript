@@ -1,4 +1,0 @@
-env = Environment(CPPPATH = '#include')
-
-env.Library('input', '#input.c')
-env.Library('stack', '#stack.c')

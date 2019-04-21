@@ -1,8 +1,0 @@
-env = Environment(CPPPATH = '#include', CCFLAGS = '-Wall')
-
-srcfiles = ['numbers.c', 'repl.c', 'solver.c', 'stack.c']
-
-progname = 'longcalc'
-progfiles = ['main.c'] + srcfiles
-
-env.Program(progname, progfiles)
